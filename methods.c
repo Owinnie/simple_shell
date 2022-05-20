@@ -1,117 +1,118 @@
 #include "sshell.h"
 /**
-  *stringToTokens - split a sentence into multiple words.
-  *@str: the string passed as argument.
-  *Return: tokens
-  */
-char **stringToTokens(char *str)
+* append_path - adds path to command
+* @path: path of command
+* @command: user entered command
+*
+* Return: buffer containing command with path on success
+* NULL on failure
+*/
+char *append_path(char *path, char *command)
 {
-int i = 0;
-const char separator[] = " ";
-int spaces = nbr_spaces(str);
-char **tokens = malloc(sizeof(char *) * (spaces + 1));
-char *token;
+	char *buf;
+	size_t i = 0, j = 0;
 
-if (!tokens)
-{
-	fprintf(stderr, "sh: allocation error\n");
-	exit(1);
-}
+	if (command == 0)
+		command = "";
 
-token = strtok(str, separator);
+	if (path == 0)
+		path = "";
 
-while (token != NULL)
-{
-	tokens[i] = token;
-	token = strtok(NULL, separator);
-	i++;
-}
-tokens[i] = NULL;
+	buf = malloc(sizeof(char) * (_strlen(path) + _strlen(command) + 2));
+	if (!buf)
+		return (NULL);
 
-return (tokens);
+	while (path[i])
+	{
+		buf[i] = path[i];
+		i++;
+	}
+
+	if (path[i - 1] != '/')
+	{
+		buf[i] = '/';
+		i++;
+	}
+	while (command[j])
+	{
+		buf[i + j] = command[j];
+		j++;
+	}
+	buf[i + j] = '\0';
+	return (buf);
 }
 /**
- * execute - executes the command
- * @cmd: command to run
- * Return: 0 on success1 -1 if cmd is exit and 1 on any other error
+ *checker- checks to see weather its a built in function
+ *@cmd: tokenized user input
+ *@buf: line drived fromgetline function
+ *Return: 1 if cmd excuted 0 if cmd is not executed
  */
-int execute(char **cmd)
+int checker(char **cmd, char *buf)
 {
-
-	pid_t child_pid;
-	int status;
-
-	if (strncmp("exit", cmd[0], 4) == 0)
-		return (-1);
-
-	child_pid = fork();
-
-	if (child_pid == -1)
+	if (handle_builtin(cmd, buf))
+		return (1);
+	else if (**cmd == '/')
 	{
-		perror("Error");
+		execution(cmd[0], cmd);
 		return (1);
 	}
-	else if (child_pid == 0)
+	return (0);
+}
+/**
+ * execution - executes commands entered by users
+ *@cp: command
+ *@cmd:vector array of pointers to commands
+ * Return: 0
+ */
+void execution(char *cp, char **cmd)
+{
+	pid_t child_pid;
+	int status;
+	char **env = environ;
+
+	child_pid = fork();
+	if (child_pid < 0)
+		perror(cp);
+	if (child_pid == 0)
 	{
-		if (execve(cmd[0], cmd, NULL) == -1)
-		{
-			perror("Error");
-			exit(-1);
-		}
+		execve(cp, cmd, env);
+		perror(cp);
+		free(cp);
+		free_buffers(cmd);
+		exit(98);
 	}
 	else
 		wait(&status);
-
-	return (0);
 }
-
-
 /**
- * main - main simple shell
- * @argc: number of arguments
- * @argv: list of command line arguments
- * Return: Always 0, -1 on error.
- */
-
-int main(int argc, char **argv)
+* exit_cmd - handles the exit command
+* @command: tokenized command
+* @line: input read from stdin
+*
+* Return: no return
+*/
+void exit_cmd(char **command, char *line)
 {
+	free(line);
+	free_buffers(command);
+	exit(0);
+}
+/**
+* free_buffers - frees buffers
+* @buf: buffer to be freed
+*
+* Return: no return
+*/
+void free_buffers(char **buf)
+{
+	int i = 0;
 
-	int response;
-	char **tokens;
-	size_t bufsize = BUFSIZ;
-	int isPipe = 0;
-	char *buffer;
-
-	if (argc >= 2)
+	if (!buf || buf == NULL)
+		return;
+	while (buf[i])
 	{
-		/*TODO: Handle cases where there is no argument, only the command*/
-		if (execve(argv[1], argv, NULL) == -1)
-		{
-			perror("Error");
-			exit(-1);
-		}
-		return (0);
+		free(buf[i]);
+		i++;
 	}
-
-	buffer = (char *)malloc(bufsize * sizeof(char));
-	if (buffer == NULL)
-	{
-		perror("Unable to allocate buffer");
-		exit(1);
-	}
-
-	do {
-		if (isatty(fileno(stdin)))
-		{
-			isPipe = 1;
-			_puts("cisfun#: ");
-		}
-
-		getline(&buffer, &bufsize, stdin);
-		buffer[_strlen(buffer) - 1] = '\0';
-		tokens = stringToTokens(buffer);
-		response = execute(tokens);
-	} while (isPipe && response != -1);
-
-	return (0);
+	free(buf);
 }
