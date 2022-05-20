@@ -32,7 +32,7 @@ while (str[i])
   *
   * Return: 0, or len of string
   */
-int _strlen(char *str)
+int _strlen(const char *str)
 {
 	int i;
 
